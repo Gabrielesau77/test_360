@@ -33,9 +33,9 @@ router.route('/:id')
     .put(protect, authorize('manager', 'admin'), validateUpdateEvaluation, updateEvaluation);
 
 router.route('/:id/submit')
-    .post(protect, authorize('admin'), validateSubmitEvaluationResponse, submitEvaluationResponse);
+    .post(protect, authorize('manager', 'admin','employee'), validateSubmitEvaluationResponse, submitEvaluationResponse);
 
-router.get('/responses/employee/:employeeId', getEmployeeResponses);
+router.get('/responses/employee/:employeeId', protect, authorize('admin',''), getEmployeeResponses);
 
 router.route('/notify')
     .get(protect, authorize('admin'), notifyPendingEvaluation);
