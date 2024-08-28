@@ -14,11 +14,6 @@ const evaluationSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    employee: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Employee',
-        required: true,
-    },
     questions: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Question',

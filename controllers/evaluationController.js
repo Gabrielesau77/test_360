@@ -1,12 +1,29 @@
 const Evaluation = require("../models/Evaluation");
+const Question = require("../models/Question");
 const Response = require('../models/Response');
 
 // Crear una nueva evaluación
 exports.createEvaluation = async (req, res) => {
     try {
-        const evaluation = await Evaluation.create(req.body);
+        const { employeeId, period, type, questions } = req.body;
+        // Verificar si todas las preguntas existen en la base de datos
+        const foundQuestions = await Question.find({ _id: { $in: questions } });
+        if (foundQuestions.length !== questions.length) {
+            return res.status(400).json({ success: false, message: 'Una o más preguntas no existen' });
+        }
+        // Crear la evaluación con las preguntas relacionadas
+        const evaluation = new Evaluation({
+            employeeId,
+            period,
+            type,
+            questions
+        });
+
+        await evaluation.save();
+
         res.status(201).json({ success: true, data: evaluation });
     } catch (error) {
+        console.log(error);
         res.status(500).json({ success: false, message: 'Error al crear la evaluación' });
     }
 };
@@ -14,7 +31,7 @@ exports.createEvaluation = async (req, res) => {
 // Listar todas las evaluaciones
 exports.getEvaluation = async (req, res) => {
     try {
-        const evaluation = await Evaluation.find().populate('employee').populate('questions');
+        const evaluation = await Evaluation.find().populate('questions');
         res.status(200).json({ success: true, data: evaluation });
     } catch (error) {
         console.log(error);
@@ -25,10 +42,11 @@ exports.getEvaluation = async (req, res) => {
 // Obtener detalles de una evaluación
 exports.getEvaluationById = async (req, res) => {
     try {
-        const evaluation = await Evaluation.findById(req.params.id).populate('employee').populate('questions');
+        const evaluation = await Evaluation.findById(req.params.id).populate('questions.questionId', 'text type options');
         if (!evaluation) {
             return res.status(404).json({ success: false, message: 'Evaluación no encontrada' });
         }
+
         res.status(200).json({ success: true, data: evaluation });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Error al obtener la evaluación' });
@@ -54,72 +72,56 @@ exports.updateEvaluation = async (req, res) => {
 };
 
 // Enviar evaluación completada
-exports.submitEvaluation = async (req, res) => {
+exports.submitEvaluationResponse = async (req, res) => {
     try {
-        const evaluation = await Evaluation.findById(req.params.id);
+        const { evaluationId, employeeId, answers } = req.body;
+        const evaluatorId = req.user.id;
 
+        // Verificar si la evaluación existe
+        const evaluation = await Evaluation.findById(evaluationId);
         if (!evaluation) {
             return res.status(404).json({ success: false, message: 'Evaluación no encontrada' });
         }
 
-        evaluation.status = 'completed';
-        await evaluation.save();
+        let totalPoints = 0;
+        let numberOfQuestions = 0;
 
-        res.status(200).json({ success: true, data: evaluation });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Error al enviar la evaluación' });
-    }
-};
+        // Calcular el puntaje total basado en las respuestas
+        answers.forEach(answer => {
+                totalPoints +=  parseFloat(answer.response);
+                numberOfQuestions++;
+        });
+        const totalScore = numberOfQuestions > 0 ? totalPoints / numberOfQuestions : 0;
 
-// Calcular puntuaciones de evaluación
-exports.calculateScores = async (req, res) => {
-    try {
-        const evaluation = await Evaluation.findById(req.params.id).populate('questions');
-        if (!evaluation) {
-            return res.status(404).json({ success: false, message: 'Evaluación no encontrada' });
-        }
-
-        // Filtrar preguntas de tipo "rating"
-        const ratingQuestions = evaluation.questions.filter(q => q.type === 'rating');
-
-        // Obtener las respuestas de la evaluación
-        const responses = await Response.find({ evaluation: evaluation._id, question: { $in: ratingQuestions.map(q => q._id) } });
-
-        // Calcular el promedio de puntuaciones
-        let totalScore = 0;
-        responses.forEach(response => {
-            totalScore += parseInt(response.answer, 10);
+        // Crear y guardar la respuesta en el modelo Response
+        const response = await Response.create({
+            employeeId,
+            evaluatorId,
+            evaluationId,
+            answers,
+            totalScore
         });
 
-        const averageScore = responses.length > 0 ? (totalScore / responses.length) : 0;
-
-        res.status(200).json({ success: true, data: { averageScore } });
+        res.status(201).json({ success: true, data: response });
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Error al calcular las puntuaciones de la evaluación' });
+        res.status(500).json({ success: false, message: 'Error al enviar las respuestas de la evaluación' });
     }
 };
-
-// Asignar evaluadores a un empleado para una evaluación
-exports.assignReviewers = async (req, res) => {
+// ver las respuestas de la evaluacion de un empleado
+exports.getEmployeeResponses = async (req, res) => {
     try {
-        const { reviewerIds } = req.body;
+        const { employeeId } = req.params;
 
-        const evaluation = await Evaluation.findById(req.params.id);
-        if (!evaluation) {
-            return res.status(404).json({ success: false, message: 'Evaluación no encontrada' });
+        // Buscar todas las respuestas asociadas al empleado
+        const responses = await Response.find({ employeeId }).populate('evaluationId').populate('evaluatorId', 'username email').populate('answers.questionId', 'text');
+
+        if (!responses || responses.length === 0) {
+            return res.status(404).json({ success: false, message: 'No se encontraron respuestas para este empleado' });
         }
 
-        const reviewers = await User.find({ _id: { $in: reviewerIds }, role: 'employee' });
-        if (reviewers.length !== reviewerIds.length) {
-            return res.status(400).json({ success: false, message: 'Algunos evaluadores no existen o no son empleados' });
-        }
-
-        evaluation.reviewers = reviewerIds;
-        await evaluation.save();
-
-        res.status(200).json({ success: true, data: evaluation });
+        res.status(200).json({ success: true, data: responses });
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Error al asignar evaluadores' });
+        res.status(500).json({ success: false, message: 'Error al obtener las respuestas del empleado' });
     }
 };
 

@@ -6,28 +6,30 @@ const userSchema = new mongoose.Schema({
     username: {
         type: String,
         required: true,
-        unique: true,
+        unique: true
     },
     email: {
         type: String,
         required: true,
-        unique: true,
+        unique: true
     },
     password: {
         type: String,
-        required: true,
+        required: true
     },
     role: {
         type: String,
         enum: ['admin', 'manager', 'employee'],
-        default: 'employee',
+        default: 'admin'
     },
-}, {
-    timestamps: true,
-});
+    assignedEmployees: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Employee'
+    }]
+}, { timestamps: true });
 
 // Método para hashear la contraseña antes de guardar el usuario
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function (next) {
     if (!this.isModified('password')) {
         return next();
     }
@@ -37,7 +39,7 @@ userSchema.pre('save', async function(next) {
 });
 
 // Método para comparar contraseñas
-userSchema.methods.matchPassword = async function(enteredPassword) {
+userSchema.methods.matchPassword = async function (enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
 };
 

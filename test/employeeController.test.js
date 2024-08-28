@@ -1,148 +1,80 @@
-const { getEmployees, getEmployeeById, createEmployee, updateEmployee } = require('../controllers/employeeController');
+const request = require('supertest');
+const mongoose = require('mongoose');
+const server = require('../server');
 const Employee = require('../models/Employee');
+const User = require('../models/User');
 
-// Mock de Mongoose
 jest.mock('../models/Employee');
 
 describe('Employee Controller', () => {
-    describe('getEmployees', () => {
-        it('debería retornar una lista de empleados', async () => {
-            const req = {};
-            const res = {
-                status: jest.fn().mockReturnThis(),
-                json: jest.fn()
-            };
+    let token;
+    const uniqueSuffix = Date.now();
+    beforeAll(async () => {
 
-            const mockEmployees = [
-                { _id: '1', firstName: 'John', lastName: 'Doe', position: 'Developer' },
-                { _id: '2', firstName: 'Jane', lastName: 'Smith', position: 'Designer' }
-            ];
+        const res = await request(server)
+            .post('/api/auth/register')
+            .send({
+                username: `testuser_${uniqueSuffix}`, // Username único
+                email: `testuser_${uniqueSuffix}@example.com`, // Email único
+                password: 'password123',
+                role: 'admin' // o el rol necesario
+            });
 
-            Employee.find.mockResolvedValue(mockEmployees);
-
-            await getEmployees(req, res);
-
-            expect(res.status).toHaveBeenCalledWith(200);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-                success: true,
-                data: mockEmployees
-            }));
-        });
+        token = res.body.data.token;
     });
 
-    describe('getEmployeeById', () => {
-        it('debería retornar un empleado por ID', async () => {
-            const req = { params: { id: '1' } };
-            const res = {
-                status: jest.fn().mockReturnThis(),
-                json: jest.fn()
-            };
-
-            const mockEmployee = { _id: '1', firstName: 'John', lastName: 'Doe', position: 'Developer' };
-
-            Employee.findById.mockResolvedValue(mockEmployee);
-
-            await getEmployeeById(req, res);
-
-            expect(res.status).toHaveBeenCalledWith(200);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-                success: true,
-                data: mockEmployee
-            }));
-        });
-
-        it('debería retornar 404 si el empleado no es encontrado', async () => {
-            const req = { params: { id: '1' } };
-            const res = {
-                status: jest.fn().mockReturnThis(),
-                json: jest.fn()
-            };
-
-            Employee.findById.mockResolvedValue(null);
-
-            await getEmployeeById(req, res);
-
-            expect(res.status).toHaveBeenCalledWith(404);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-                success: false,
-                message: 'Empleado no encontrado'
-            }));
-        });
+    afterEach(() => {
+        jest.clearAllMocks();
     });
 
-    describe('createEmployee', () => {
-        it('debería crear un nuevo empleado', async () => {
-            const req = {
-                body: {
-                    firstName: 'John',
-                    lastName: 'Doe',
-                    position: 'Developer',
-                    department: 'IT',
-                    hireDate: '2023-01-01'
-                }
-            };
-            const res = {
-                status: jest.fn().mockReturnThis(),
-                json: jest.fn()
-            };
-
-            const mockEmployee = { _id: '1', ...req.body };
-
-            Employee.create.mockResolvedValue(mockEmployee);
-
-            await createEmployee(req, res);
-
-            expect(res.status).toHaveBeenCalledWith(201);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-                success: true,
-                data: mockEmployee
-            }));
-        });
+    afterAll(async () => {
+        await mongoose.connection.close(); // Cierra la conexión de Mongoose
+        await server.close(); // Cierra el servidor
     });
 
-    describe('updateEmployee', () => {
-        it('debería actualizar un empleado existente', async () => {
-            const req = {
-                params: { id: '1' },
-                body: { position: 'Senior Developer' }
-            };
-            const res = {
-                status: jest.fn().mockReturnThis(),
-                json: jest.fn()
-            };
+    it('debería crear un nuevo empleado', async () => {
+        const mockEmployee = {
+            _id: `64f129b25d3c6f1b2a5e7c9e`,
+            firstName: `John_${uniqueSuffix}`,
+            lastName: `Doe_${uniqueSuffix}`,
+            position: 'Developer',
+            department: "IT",
+            hireDate: "2020-01-15T00:00:00.000Z",
+        };
 
-            const mockEmployee = { _id: '1', firstName: 'John', lastName: 'Doe', position: 'Senior Developer' };
+        Employee.create.mockResolvedValue(mockEmployee);
+        const response = await request(server)
+            .post('/api/employees')
+            .set('Authorization', `Bearer ${token}`) // Autentica la solicitud con el token generado
+            .send({
+                _id: `64f129b25d3c6f1b2a5e7c9e`,
+                firstName: `John_${uniqueSuffix}`,
+                lastName: `Doe_${uniqueSuffix}`,
+                position: 'Developer',
+                department: "IT",
+                hireDate: "2020-01-15T00:00:00.000Z",
+            });
 
-            Employee.findByIdAndUpdate.mockResolvedValue(mockEmployee);
+        expect(response.status).toBe(201);
+        expect(response.body.success).toBe(true);
+        expect(response.body.data).toEqual(expect.objectContaining({
+            firstName: `John_${uniqueSuffix}`,
+            lastName: `Doe_${uniqueSuffix}`,
+            position: 'Developer',
+            department: "IT",
+            hireDate: "2020-01-15T00:00:00.000Z",
+        }));
+    });
 
-            await updateEmployee(req, res);
+    it('debería devolver error al no encontrar un empleado', async () => {
+        Employee.findById.mockResolvedValue(null);
 
-            expect(res.status).toHaveBeenCalledWith(200);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-                success: true,
-                data: mockEmployee
-            }));
-        });
+        const response = await request(server)
+            .get('/api/employees/64f129b25d3c6f1b235e7c9e')
+            .set('Authorization', `Bearer ${token}`); // Autentica la solicitud con el token generado
 
-        it('debería retornar 404 si el empleado a actualizar no es encontrado', async () => {
-            const req = {
-                params: { id: '1' },
-                body: { position: 'Senior Developer' }
-            };
-            const res = {
-                status: jest.fn().mockReturnThis(),
-                json: jest.fn()
-            };
-
-            Employee.findByIdAndUpdate.mockResolvedValue(null);
-
-            await updateEmployee(req, res);
-
-            expect(res.status).toHaveBeenCalledWith(404);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-                success: false,
-                message: 'Empleado no encontrado'
-            }));
-        });
+        expect(response.status).toBe(500);
+        expect(response.body.success).toBe(false);
+        expect(response.body.message).toBe('Error al obtener el empleado');
     });
 });

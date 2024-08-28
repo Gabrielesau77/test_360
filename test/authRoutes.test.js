@@ -1,10 +1,11 @@
-// tests/authRoutes.test.js
 const request = require('supertest');
-const server = require('../server');
+const mongoose = require('mongoose'); // Importa Mongoose
+const server = require('../server'); // Importa el servidor
 
 describe('Auth API', () => {
     afterAll(async () => {
-        await server.close(); // Cerrar el servidor al finalizar las pruebas
+        await mongoose.connection.close(); // Cierra la conexión de Mongoose
+        await server.close(); // Cierra el servidor
     });
 
     // Función para generar un username único

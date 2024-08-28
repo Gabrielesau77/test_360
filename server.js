@@ -6,6 +6,7 @@ const authRoutes = require('./routes/authRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
 const evaluationRoutes = require('./routes/evaluationRoutes');
 const questionRoutes = require('./routes/questionRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 const swaggerDocs = require('./swagger');
 const errorHandler = require('./middlewares/errorMiddleware');
 const helmet = require('helmet');
@@ -34,6 +35,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/evaluations', evaluationRoutes);
 app.use('/api/questions', questionRoutes);
+app.use('/api/reports', reportRoutes);
 
 app.use(errorHandler);
 

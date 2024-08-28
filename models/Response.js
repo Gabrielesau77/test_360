@@ -1,27 +1,43 @@
 const mongoose = require('mongoose');
 
+
 const responseSchema = new mongoose.Schema({
-    evaluation: {
+    employeeId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Evaluation',
-        required: true,
+        ref: 'Employee',
+        required: true
     },
-    question: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Question',
-        required: true,
-    },
-    respondent: {
+    evaluatorId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true,
+        required: true
     },
-    answer: {
-        type: mongoose.Schema.Types.Mixed, // Puede ser un número (rating) o texto
-        required: true,
+    evaluationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Evaluation',
+        required: true
     },
-}, {
-    timestamps: true,
+    answers: [
+        {
+            questionId: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'Question',
+                required: true
+            },
+            response: {
+                type: String, // Esto puede ser un número si son respuestas tipo rating o un texto
+                required: true
+            }
+        }
+    ],
+    totalScore: {
+        type: Number,
+        required: true
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
+    }
 });
 
 module.exports = mongoose.model('Response', responseSchema);

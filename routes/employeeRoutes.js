@@ -1,5 +1,5 @@
 const express = require('express');
-const { getEmployees, getEmployeeById, createEmployee, updateEmployee } = require('../controllers/employeeController');
+const { getEmployees, getEmployeeById, createEmployee, updateEmployee, assignEvaluatorsToEmployee, getEmployeeEvaluators } = require('../controllers/employeeController');
 const { protect, authorize } = require('../middlewares/authMiddleware');
 const { check, validationResult } = require('express-validator');
 
@@ -48,5 +48,13 @@ router.route('/:id')
         },
         updateEmployee
     );
+
+// Asignar evaluadores a un empleado
+router.route('/assign-evaluators/:id')
+    .post(protect, authorize('manager', 'admin'), assignEvaluatorsToEmployee);
+// ver evaluadores de un empleado
+router.route('/get-Employee-evaluators/:id')
+    .post(protect, authorize('manager', 'admin'), getEmployeeEvaluators);
+
 
 module.exports = router;

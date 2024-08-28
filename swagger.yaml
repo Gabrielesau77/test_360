@@ -70,13 +70,11 @@ components:
           description: Periodo de la evaluación (ej. "Q1 2023")
         status:
           type: string
-          enum: [pending, in_progress, completed]
+          enum: [activa, cancelada]
           description: Estado de la evaluación
         type:
           type: string
           description: Tipo de evaluación
-        employee:
-          $ref: '#/components/schemas/Employee'
         createdAt:
           type: string
           format: date-time
@@ -89,7 +87,6 @@ components:
         period: "Q1 2023"
         status: pending
         type: "Desempeño"
-        employee: "66ce4ca03a7700d9c720946b"
 
     Question:
       type: object
@@ -338,8 +335,10 @@ paths:
                 items:
                   $ref: '#/components/schemas/Evaluation'
     post:
-      summary: Crear una nueva evaluación
-      tags: [Evaluations]
+      summary: "Crear una nueva evaluación"
+      description: "Crea una nueva evaluación y la asocia con preguntas existentes."
+      tags:
+        - "Evaluations"
       security:
         - bearerAuth: []
       requestBody:
@@ -347,14 +346,40 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Evaluation'
+              type: "object"
+              properties:
+                period:
+                  type: "string"
+                  description: "Periodo de la evaluación"
+                status:
+                  type: string
+                  enum: [activa, cancelada]
+                  description: Estado de la evaluación
+                type:
+                  type: "string"
+                  description: "Tipo de evaluación (anual, semestral, etc.)"
+                questions:
+                  type: "array"
+                  items:
+                    type: "string"
+                  description: "Array de IDs de las preguntas a asociar con la evaluación"
+              required:
+                - period
+                - status
+                - type
+                - questions
       responses:
-        '201':
-          description: Evaluación creada exitosamente
+        "201":
+          description: "Evaluación creada con éxito"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Evaluation'
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  data:
+                    $ref: "#/components/schemas/Evaluation"
 
   /evaluations/{id}:
     get:
@@ -407,94 +432,53 @@ paths:
           description: Evaluación no encontrada
 
   /evaluations/{id}/submit:
-    post:
-      summary: Enviar una evaluación completada
-      tags: [Evaluations]
+     post:
+      summary: "Enviar respuestas a una evaluación"
+      description: "Permite que un evaluador envíe sus respuestas a una evaluación y calcula el puntaje total."
+      tags:
+        - "Responses"
       security:
         - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          schema:
-            type: string
-          required: true
-          description: ID de la evaluación
-      responses:
-        '200':
-          description: Evaluación enviada exitosamente
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Evaluation'
-        '404':
-          description: Evaluación no encontrada
-  /evaluations/{id}/scores:
-    get:
-      summary: Calcular puntuaciones de evaluación
-      tags: [Evaluations]
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          schema:
-            type: string
-          required: true
-          description: ID de la evaluación
-      responses:
-        '200':
-          description: Puntuación promedio calculada
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  averageScore:
-                    type: number
-                    description: Puntuación promedio de la evaluación
-        '404':
-          description: Evaluación no encontrada
-        '500':
-          description: Error al calcular las puntuaciones
-
-  /evaluations/{id}/reviewers:
-    put:
-      summary: Asignar evaluadores a un empleado para una evaluación
-      tags: [Evaluations]
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          schema:
-            type: string
-          required: true
-          description: ID de la evaluación
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
+              type: "object"
               properties:
-                reviewerIds:
-                  type: array
+                evaluationId:
+                  type: "string"
+                  description: "ID de la evaluación a la que se responde"
+                employeeId:
+                  type: "string"
+                  description: "ID del empleado que está siendo evaluado"
+                answers:
+                  type: "array"
                   items:
-                    type: string
-                  description: IDs de los evaluadores asignados
+                    type: "object"
+                    properties:
+                      questionId:
+                        type: "string"
+                        description: "ID de la pregunta"
+                      response:
+                        type: "string"
+                        description: "Respuesta del evaluador"
+                  description: "Array de respuestas para las preguntas de la evaluación"
+              required:
+                - evaluationId
+                - answers
       responses:
-        '200':
-          description: Evaluadores asignados exitosamente
+        "201":
+          description: "Respuestas enviadas y guardadas con éxito"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Evaluation'
-        '400':
-          description: Error en los IDs de los evaluadores proporcionados
-        '404':
-          description: Evaluación no encontrada
-        '500':
-          description: Error al asignar evaluadores
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  data:
+                    $ref: "#/components/schemas/Response"
 
   /evaluations/notify:
     get:
@@ -589,6 +573,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/User'
+      responses:
+        '201':
+          description: registro creado exitosamente
 
   /auth/login:
     post:
@@ -600,6 +587,262 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Login'
-        '401':
-          description: Credenciales inválidas
+      responses:
+        '201':
+          description: Pregunta creada exitosamente
+      
+  /employees/assign-evaluators/{id}:
+    post:
+      summary: "Asignar evaluadores a un empleado"
+      description: "Asigna uno o más usuarios como evaluadores de un empleado."
+      tags:
+        - "Employees"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: "id"
+          in: "path"
+          required: true
+          description: "ID del empleado"
+          schema:
+            type: "string"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                evaluators:
+                  type: "array"
+                  items:
+                    type: "string"
+                  description: "Array de IDs de usuarios que serán evaluadores"
+              required:
+                - evaluators
+      responses:
+        "200":
+          description: "Evaluadores asignados con éxito"
+                
+  /employees/get-Employee-evaluators/{id}:
+    post:
+      summary: "Obtener los evaluadores de un empleado"
+      description: "Obtiene la lista de evaluadores asignados a un empleado."
+      tags:
+        - "Employees"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: "id"
+          in: "path"
+          required: true
+          description: "ID del empleado"
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "Lista de evaluadores obtenida con éxito"
 
+  /evaluations/responses/employee/{employeeId}:
+    get:
+      summary: "Obtener respuestas de un empleado"
+      description: "Obtiene todas las respuestas de las evaluaciones realizadas a un empleado específico."
+      tags:
+        - "Responses"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: "employeeId"
+          in: "path"
+          required: true
+          description: "ID del empleado"
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "Respuestas obtenidas con éxito"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/Response"
+
+  /reports/employee/{employeeId}:
+    get:
+      summary: "Obtener reporte de un empleado específico"
+      description: "Obtiene las evaluaciones y puntajes de un empleado."
+      tags:
+        - "Reports"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: "employeeId"
+          in: "path"
+          required: true
+          description: "ID del empleado"
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "Reporte obtenido con éxito"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/Response"
+        "404":
+          description: "No se encontraron evaluaciones para este empleado"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  message:
+                    type: "string"
+        "500":
+          description: "Error interno del servidor"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  message:
+                    type: "string"
+  /reports/evaluation/{evaluationId}:
+    get:
+      summary: "Obtener reporte de una evaluación específica"
+      description: "Obtiene los detalles de una evaluación específica, incluyendo los puntajes de todos los empleados."
+      tags:
+        - "Reports"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: "evaluationId"
+          in: "path"
+          required: true
+          description: "ID de la evaluación"
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "Reporte obtenido con éxito"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/Response"
+        "404":
+          description: "No se encontraron respuestas para esta evaluación"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  message:
+                    type: "string"
+        "500":
+          description: "Error interno del servidor"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  message:
+                    type: "string"
+  /reports/all:
+    get:
+      summary: "Obtener reporte general de todas las evaluaciones"
+      description: "Obtiene un reporte general de todas las evaluaciones y puntajes de todos los empleados."
+      tags:
+        - "Reports"
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: "Reporte general obtenido con éxito"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/Response"
+        "404":
+          description: "No se encontraron evaluaciones"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  message:
+                    type: "string"
+        "500":
+          description: "Error interno del servidor"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  message:
+                    type: "string"
+  /reports/summary:
+    get:
+      summary: "Obtener resumen general con promedios de puntajes por evaluación"
+      description: "Obtiene un resumen general de todas las evaluaciones, mostrando el promedio de puntajes por evaluación."
+      tags:
+        - "Reports"
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: "Resumen de reportes obtenido con éxito"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  data:
+                    type: "array"
+                    items:
+                      type: "object"
+                      properties:
+                        evaluation:
+                          type: "string"
+                        averageScore:
+                          type: "number"
