@@ -48,7 +48,6 @@ components:
           format: date-time
           description: Fecha de última actualización del empleado
       example:
-        id: 60d5f74f5311234567890abc
         firstName: John
         lastName: Doe
         position: Developer
@@ -87,12 +86,10 @@ components:
           format: date-time
           description: Fecha de última actualización de la evaluación
       example:
-        id: 60d5f74f5311234567890def
         period: "Q1 2023"
         status: pending
         type: "Desempeño"
-        employee:
-          $ref: '#/components/schemas/Employee'
+        employee: "66ce4ca03a7700d9c720946b"
 
     Question:
       type: object
@@ -124,7 +121,6 @@ components:
           format: date-time
           description: Fecha de última actualización de la pregunta
       example:
-        id: 60d5f74f5311234567890ghi
         text: "¿Cómo calificaría la capacidad de comunicación del empleado?"
         type: rating
         options:
@@ -163,7 +159,6 @@ components:
           format: date-time
           description: Fecha de última actualización de la respuesta
       example:
-        id: 60d5f74f5311234567890jkl
         evaluation:
           $ref: '#/components/schemas/Evaluation'
         question:
@@ -209,6 +204,22 @@ components:
         password: Abc123*
         email: johndoe@example.com
         role: admin
+
+    Login:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          description: Correo electrónico del usuario
+        password:
+          type: string
+          description: Contraseña del usuario
+      example:
+        password: Abc123*
+        email: johndoe@example.com
 
   securitySchemes:
     bearerAuth:
@@ -578,13 +589,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/User'
-      responses:
-        '201':
-          description: Usuario registrado exitosamente
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/User'
 
   /auth/login:
     post:
@@ -595,14 +599,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/User'
-      responses:
-        '200':
-          description: Usuario autenticado exitosamente
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/User'
+              $ref: '#/components/schemas/Login'
         '401':
           description: Credenciales inválidas
 

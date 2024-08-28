@@ -7,28 +7,41 @@ const employeeRoutes = require('./routes/employeeRoutes');
 const evaluationRoutes = require('./routes/evaluationRoutes');
 const questionRoutes = require('./routes/questionRoutes');
 const swaggerDocs = require('./swagger');
+const errorHandler = require('./middlewares/errorMiddleware');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
+const rateLimit = require('express-rate-limit');
 
 dotenv.config();
 
 const app = express();
 
-// Middleware para parsear JSON
 app.use(express.json());
+app.use(helmet());
+app.use(mongoSanitize());
 
-// Conectar a la base de datos MongoDB
+// Configurar rate limiter para toda la API
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 100, // límite de 100 solicitudes por IP
+    message: 'Demasiadas solicitudes desde esta IP, por favor intenta de nuevo más tarde.'
+});
+app.use(limiter);
+
 connectDB();
 
-// Rutas
 app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/evaluations', evaluationRoutes);
 app.use('/api/questions', questionRoutes);
 
-// Integrar Swagger
+app.use(errorHandler);
+
 swaggerDocs(app, process.env.PORT || 5000);
 
 const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
+
+module.exports = server;
